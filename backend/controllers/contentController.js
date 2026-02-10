@@ -164,11 +164,36 @@ const getContent = async (req, res) => {
       });
     }
 
+    // Enforce one-time view for files before incrementing
+    if (content.oneTimeView && content.type === 'file' && content.viewCount >= 1) {
+      return res.status(403).json({
+        success: false,
+        message: 'Content has already been viewed'
+      });
+    }
+
     // Increment view count
     content.viewCount += 1;
 
     // If one-time view, delete after showing
     if (content.oneTimeView && content.viewCount >= 1) {
+      if (content.type === 'file') {
+        // Keep record until download completes
+        await content.save();
+        return res.status(200).json({
+          success: true,
+          data: {
+            type: content.type,
+            fileName: content.fileName,
+            fileType: content.fileType,
+            expiresAt: content.expiresAt,
+            viewCount: content.viewCount,
+            maxViews: content.maxViews
+          },
+          oneTimeView: true
+        });
+      }
+
       const contentData = {
         type: content.type,
         textContent: content.textContent,
@@ -273,7 +298,7 @@ const downloadFile = async (req, res) => {
     }
 
     // Send file
-    res.download(content.filePath, content.fileName, (err) => {
+    res.download(content.filePath, content.fileName, async (err) => {
       if (err) {
         console.error('Download error:', err);
         if (!res.headersSent) {
@@ -281,6 +306,19 @@ const downloadFile = async (req, res) => {
             success: false, 
             message: 'Failed to download file' 
           });
+        }
+        return;
+      }
+
+      // Delete one-time view content after successful download
+      if (content.oneTimeView) {
+        try {
+          await Content.deleteOne({ _id: content._id });
+          if (content.filePath) {
+            fs.unlinkSync(content.filePath);
+          }
+        } catch (cleanupErr) {
+          console.error('Error deleting one-time file:', cleanupErr);
         }
       }
     });
