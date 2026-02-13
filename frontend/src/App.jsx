@@ -1,16 +1,17 @@
 import React from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import UploadPage from './pages/UploadPage';
 import ViewPage from './pages/ViewPage';
 
-const App = () => {
+function App() {
   return (
-    <Routes>
-      <Route path="/" element={<UploadPage />} />
-      <Route path="/view/:id" element={<ViewPage />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <Router>
+      <Routes>
+        <Route path="/" element={<UploadPage />} />
+        <Route path="/view/:id" element={<ViewPage />} />
+      </Routes>
+    </Router>
   );
-};
+}
 
 export default App;
