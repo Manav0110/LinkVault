@@ -2,19 +2,24 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Upload, FileText, Lock, Clock, Eye, Download, Shield } from 'lucide-react';
 import { uploadContent } from '../services/api';
+import { clearAuthSession, getCurrentUser } from '../utils/auth';
 
 const UploadPage = () => {
   const navigate = useNavigate();
+  const currentUser = getCurrentUser();
   const [uploadType, setUploadType] = useState('text');
   const [textContent, setTextContent] = useState('');
   const [file, setFile] = useState(null);
   const [expiryMinutes, setExpiryMinutes] = useState('10');
+  const [expiryDate, setExpiryDate] = useState('');
+  const [expiryTime, setExpiryTime] = useState('');
   const [password, setPassword] = useState('');
   const [oneTimeView, setOneTimeView] = useState(false);
   const [maxViews, setMaxViews] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [shareLink, setShareLink] = useState('');
+  const [uploadedExpiresAt, setUploadedExpiresAt] = useState('');
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -48,6 +53,8 @@ const UploadPage = () => {
       }
 
       formData.append('expiryMinutes', expiryMinutes);
+      if (expiryDate) formData.append('expiryDate', expiryDate);
+      if (expiryTime) formData.append('expiryTime', expiryTime);
       if (password) formData.append('password', password);
       formData.append('oneTimeView', oneTimeView);
       if (maxViews) formData.append('maxViews', maxViews);
@@ -56,6 +63,7 @@ const UploadPage = () => {
 
       if (response.success) {
         setShareLink(response.data.shareLink);
+        setUploadedExpiresAt(response.data.expiresAt);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to upload content');
@@ -77,6 +85,9 @@ const UploadPage = () => {
     setOneTimeView(false);
     setMaxViews('');
     setExpiryMinutes('10');
+    setExpiryDate('');
+    setExpiryTime('');
+    setUploadedExpiresAt('');
   };
 
   if (shareLink) {
@@ -114,9 +125,11 @@ const UploadPage = () => {
               <div className="bg-vault-bg rounded-lg p-4">
                 <div className="flex items-center gap-2 text-vault-text-dim mb-1">
                   <Clock className="w-4 h-4" />
-                  <span>Expires in</span>
+                  <span>Expires at</span>
                 </div>
-                <div className="text-vault-text font-semibold">{expiryMinutes} minutes</div>
+                <div className="text-vault-text font-semibold">
+                  {uploadedExpiresAt ? new Date(uploadedExpiresAt).toLocaleString() : '10 minutes'}
+                </div>
               </div>
               <div className="bg-vault-bg rounded-lg p-4">
                 <div className="flex items-center gap-2 text-vault-text-dim mb-1">
@@ -144,6 +157,37 @@ const UploadPage = () => {
   return (
     <div className="min-h-screen grid-background flex items-center justify-center p-4">
       <div className="w-full max-w-3xl">
+        <div className="flex justify-end gap-2 mb-4">
+          {currentUser ? (
+            <>
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard')}
+                className="cyber-button bg-vault-card text-vault-text border border-vault-border px-3 py-2 rounded-lg text-sm"
+              >
+                Dashboard
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  clearAuthSession();
+                  navigate('/auth');
+                }}
+                className="cyber-button bg-vault-card text-vault-text border border-vault-border px-3 py-2 rounded-lg text-sm"
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => navigate('/auth')}
+              className="cyber-button bg-vault-card text-vault-text border border-vault-border px-3 py-2 rounded-lg text-sm"
+            >
+              Login / Register
+            </button>
+          )}
+        </div>
         <div className="text-center mb-8 fade-in">
           <h1 className="text-5xl font-display font-bold mb-3 bg-gradient-to-r from-vault-accent to-cyan-400 bg-clip-text text-transparent">
             LinkVault
@@ -232,15 +276,33 @@ const UploadPage = () => {
             <div className="mb-6">
               <label className="block text-sm font-medium mb-2 text-vault-text flex items-center gap-2">
                 <Clock className="w-4 h-4" />
-                Expiry Time (minutes)
+                Expiry (date/time or default minutes)
               </label>
-              <input
-                type="number"
-                value={expiryMinutes}
-                onChange={(e) => setExpiryMinutes(e.target.value)}
-                min="1"
-                className="w-full bg-vault-card border border-vault-border rounded-xl px-4 py-3 text-vault-text focus:outline-none focus:border-vault-accent"
-              />
+              <div className="grid md:grid-cols-3 gap-3">
+                <input
+                  type="date"
+                  value={expiryDate}
+                  onChange={(e) => setExpiryDate(e.target.value)}
+                  className="w-full bg-vault-card border border-vault-border rounded-xl px-4 py-3 text-vault-text focus:outline-none focus:border-vault-accent"
+                />
+                <input
+                  type="time"
+                  value={expiryTime}
+                  onChange={(e) => setExpiryTime(e.target.value)}
+                  className="w-full bg-vault-card border border-vault-border rounded-xl px-4 py-3 text-vault-text focus:outline-none focus:border-vault-accent"
+                />
+                <input
+                  type="number"
+                  value={expiryMinutes}
+                  onChange={(e) => setExpiryMinutes(e.target.value)}
+                  min="1"
+                  className="w-full bg-vault-card border border-vault-border rounded-xl px-4 py-3 text-vault-text focus:outline-none focus:border-vault-accent"
+                  placeholder="Default: 10 minutes"
+                />
+              </div>
+              <p className="text-xs text-vault-text-dim mt-2">
+                If date/time is not selected, content expires in 10 minutes by default.
+              </p>
             </div>
 
             {/* Optional Features */}

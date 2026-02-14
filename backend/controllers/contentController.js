@@ -3,10 +3,67 @@ const { nanoid } = require('nanoid');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
 
+const DEFAULT_EXPIRY_MINUTES = 10;
+
+const resolveExpiryDate = ({ expiryMinutes, expiryDate, expiryTime }) => {
+  const now = new Date();
+  const hasDate = Boolean(expiryDate);
+  const hasTime = Boolean(expiryTime);
+
+  if (hasDate || hasTime) {
+    let target = new Date(now);
+
+    if (hasDate) {
+      const [year, month, day] = String(expiryDate).split('-').map(Number);
+      if (!year || !month || !day) return null;
+      target.setFullYear(year, month - 1, day);
+    }
+
+    if (hasTime) {
+      const [hours, minutes] = String(expiryTime).split(':').map(Number);
+      if (
+        Number.isNaN(hours) ||
+        Number.isNaN(minutes) ||
+        hours < 0 ||
+        hours > 23 ||
+        minutes < 0 ||
+        minutes > 59
+      ) {
+        return null;
+      }
+      target.setHours(hours, minutes, 0, 0);
+    } else {
+      target.setHours(23, 59, 59, 999);
+    }
+
+    if (!hasDate && hasTime && target <= now) {
+      target.setDate(target.getDate() + 1);
+    }
+
+    if (target <= now) return null;
+    return target;
+  }
+
+  const parsedMinutes = parseInt(expiryMinutes, 10);
+  const ttlMinutes =
+    Number.isInteger(parsedMinutes) && parsedMinutes > 0
+      ? parsedMinutes
+      : DEFAULT_EXPIRY_MINUTES;
+  return new Date(now.getTime() + ttlMinutes * 60 * 1000);
+};
+
 // Upload content (text or file)
 const uploadContent = async (req, res) => {
   try {
-    const { text, expiryMinutes, password, oneTimeView, maxViews } = req.body;
+    const {
+      text,
+      expiryMinutes,
+      expiryDate,
+      expiryTime,
+      password,
+      oneTimeView,
+      maxViews
+    } = req.body;
     const file = req.file;
 
     // Validation
@@ -31,14 +88,20 @@ const uploadContent = async (req, res) => {
     // Generate unique ID
     const uniqueId = nanoid(10);
 
-    // Calculate expiry time
-    const expiryTime = parseInt(expiryMinutes) || 10; // Default 10 minutes
-    const expiresAt = new Date(Date.now() + expiryTime * 60 * 1000);
+    // Calculate expiry time from date/time selection or fallback to default minutes
+    const expiresAt = resolveExpiryDate({ expiryMinutes, expiryDate, expiryTime });
+    if (!expiresAt) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please select a valid future date/time for expiry'
+      });
+    }
 
     // Prepare content data
     const contentData = {
       uniqueId,
       expiresAt,
+      owner: req.user ? req.user._id : null,
       oneTimeView: oneTimeView === 'true' || oneTimeView === true,
       maxViews: maxViews ? parseInt(maxViews) : null
     };
@@ -114,6 +177,13 @@ const getContent = async (req, res) => {
       return res.status(404).json({ 
         success: false, 
         message: 'Content not found or has expired' 
+      });
+    }
+
+    if (content.isActive === false) {
+      return res.status(410).json({
+        success: false,
+        message: 'This link has been deactivated'
       });
     }
 
@@ -253,6 +323,13 @@ const downloadFile = async (req, res) => {
       return res.status(404).json({ 
         success: false, 
         message: 'File not found or has expired' 
+      });
+    }
+
+    if (content.isActive === false) {
+      return res.status(410).json({
+        success: false,
+        message: 'This link has been deactivated'
       });
     }
 

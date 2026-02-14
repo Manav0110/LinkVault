@@ -48,6 +48,20 @@ const contentSchema = new mongoose.Schema({
     type: Number,
     default: null
   },
+  owner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+    index: true
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  deactivatedAt: {
+    type: Date,
+    default: null
+  },
   expiresAt: {
     type: Date,
     required: true

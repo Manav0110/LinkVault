@@ -1,11 +1,12 @@
 const express = require('express');
 const { uploadContent, getContent, downloadFile, deleteContent } = require('../controllers/contentController');
 const upload = require('../config/multer');
+const { optionalAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
 // Upload content (text or file)
-router.post('/upload', upload.single('file'), uploadContent);
+router.post('/upload', optionalAuth, upload.single('file'), uploadContent);
 
 // Get content by ID
 router.post('/content/:id', getContent);

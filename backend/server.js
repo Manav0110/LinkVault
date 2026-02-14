@@ -3,6 +3,8 @@ require('dotenv').config();
 const cors = require('cors');
 const connectDB = require('./config/database');
 const contentRoutes = require('./routes/contentRoutes');
+const authRoutes = require('./routes/authRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
 const cleanupJob = require('./jobs/cleanupJob');
 
 // Initialize express app
@@ -22,6 +24,8 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api', contentRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
